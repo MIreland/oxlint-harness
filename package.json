@@ -1,0 +1,33 @@
+{
+  "name": "oxlint-harness",
+  "version": "1.0.0",
+  "description": "A harness for oxlint with bulk suppressions support",
+  "type": "module",
+  "main": "src/index.ts",
+  "bin": {
+    "oxlint-harness": "src/cli.ts"
+  },
+  "scripts": {
+    "build": "tsgo",
+    "dev": "node src/cli.ts",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "lint": "oxlint src/",
+    "typecheck": "tsgo"
+  },
+  "keywords": ["oxlint", "linting", "suppressions", "eslint"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@oclif/core": "^4.0.0",
+    "@oclif/plugin-help": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@typescript/native-preview": "7.0.0-dev.20251222.1",
+    "vitest": "4.0.16"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
