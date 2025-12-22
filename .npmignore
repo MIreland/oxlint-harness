@@ -1,0 +1,15 @@
+src/
+test/
+*.test.ts
+*.spec.ts
+.git/
+.vscode/
+.idea/
+tsconfig.json
+vitest.config.ts
+.env
+.env.*
+coverage/
+*.log
+.DS_Store
+Thumbs.db
