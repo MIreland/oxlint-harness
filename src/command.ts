@@ -2,6 +2,7 @@ import { Command, Flags, Args } from '@oclif/core';
 import { OxlintRunner } from './oxlint-runner.js';
 import { SuppressionManager } from './suppression-manager.js';
 import { ErrorReporter } from './error-reporter.js';
+import { ColorFormatter } from './colors.js';
 
 export default class OxlintHarness extends Command {
   static summary = 'Run oxlint with bulk suppressions support';
@@ -40,6 +41,10 @@ The suppression file format uses counts per rule per file:
       default: true,
       allowNo: true,
     }),
+    'show-code': Flags.integer({
+      description: 'Show code snippets for files with N or fewer errors (0 to disable)',
+      default: 3,
+    }),
     help: Flags.help({ char: 'h' }),
   };
 
@@ -54,6 +59,7 @@ The suppression file format uses counts per rule per file:
 
   async run(): Promise<void> {
     const { flags, argv } = await this.parse(OxlintHarness);
+    const colors = new ColorFormatter();
 
     try {
       // Run oxlint with remaining args
@@ -69,8 +75,8 @@ The suppression file format uses counts per rule per file:
         const updatedSuppressions = suppressionManager.updateSuppressions(currentSuppressions, diagnostics);
         suppressionManager.saveSuppressions(updatedSuppressions);
 
-        this.log(`Updated suppression file: ${flags.suppressions}`);
-        this.log(`Total diagnostics: ${diagnostics.length}`);
+        this.log(`${colors.success('Updated suppression file:')} ${colors.filename(flags.suppressions)}`);
+        this.log(`${colors.info('Total diagnostics:')} ${colors.emphasis(diagnostics.length.toString())}`);
         return;
       }
 
@@ -79,13 +85,13 @@ The suppression file format uses counts per rule per file:
       const excessErrors = suppressionManager.findExcessErrors(diagnostics, suppressions);
 
       if (excessErrors.length === 0) {
-        this.log('✅ All errors are suppressed');
+        this.log(`${colors.successIcon()} ${colors.success('All errors are suppressed')}`);
         return;
       }
 
       // Report excess errors
       const reporter = new ErrorReporter();
-      reporter.reportExcessErrors(excessErrors);
+      reporter.reportExcessErrors(excessErrors, flags['show-code']);
 
       if (flags['fail-on-excess']) {
         this.exit(1);
