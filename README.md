@@ -6,7 +6,9 @@ A harness for [oxlint](https://oxc.rs) that provides ESLint-style bulk suppressi
 
 - ✅ **Bulk Suppressions**: Suppress specific counts of lint violations per file per rule
 - ✅ **Incremental Adoption**: Only fail on new violations beyond suppressed counts
-- ✅ **Detailed Reporting**: Rich error output with context and suggestions
+- ✅ **Rich Colored Output**: Beautiful terminal colors with syntax highlighting
+- ✅ **Code Snippets**: Show actual code context for files with few errors (configurable)
+- ✅ **Smart Package Detection**: Auto-detects pnpm/yarn/npm with monorepo support
 - ✅ **Update Mode**: Generate/update suppression files automatically
 - ✅ **Pass-through**: Forward all arguments to oxlint seamlessly
 
@@ -57,6 +59,7 @@ The suppression file uses a count-based format:
 |--------|--------|-------------|---------|
 | `--suppressions` | `-s` | Path to suppression file | `.oxlint-suppressions.json` |
 | `--update` | `-u` | Update/create suppression file | `false` |
+| `--show-code` |  | Show code snippets for files with N or fewer errors (0 to disable) | `3` |
 | `--fail-on-excess` |  | Exit 1 if unsuppressed errors exist | `true` |
 | `--no-fail-on-excess` |  | Don't exit 1 on unsuppressed errors | - |
 | `--help` | `-h` | Show help | - |
@@ -76,6 +79,12 @@ npx oxlint-harness --type-aware src/
 
 # Use different suppression file
 npx oxlint-harness -s .eslint-suppressions.json src/
+
+# Show code snippets for files with ≤1 error
+npx oxlint-harness --show-code 1 src/
+
+# Disable code snippets (simple list only)
+npx oxlint-harness --show-code 0 src/
 ```
 
 ### Generating Suppressions
@@ -119,30 +128,65 @@ npx oxlint-harness --no-fail-on-excess src/
 
 ### Example Output
 
+#### With Code Snippets (default for files with ≤3 errors)
 ```
 ❌ Found unsuppressed errors:
 
 📄 src/App.tsx:
-  ⚠️  no-unused-vars: 2 excess errors (expected: 1, actual: 3)
-    • src/App.tsx:15: 'unused' is assigned a value but never used
-    • src/App.tsx:23: 'data' is assigned a value but never used
-    • src/App.tsx:31: 'config' is assigned a value but never used
-    💡 To suppress, add to suppression file:
-       "src/App.tsx": { "no-unused-vars": { "count": 3 } }
+  ⚠️  eslint(no-unused-vars): 1 excess error (expected: 0, actual: 1)
+
+  × eslint(no-unused-vars): Variable 'thing' is declared but never used. Unused variables should start with a '_'.
+     ╭─[24:7]
+  24 │ }));
+  25 │
+  26 │ const thing = 3;
+              ─────────────
+  27 │
+  28 │ const PartnerAppRootBase: React.VFC = () => {
+     ╰────
+  help: Consider removing this declaration.
+
+    📝 To suppress, add to suppression file:
+       "src/App.tsx": { "eslint(no-unused-vars)": { "count": 1 } }
 
 📊 Summary:
    • Files with issues: 1
    • Rules with excess errors: 1
-   • Total excess errors: 2
+   • Total excess errors: 1
 
 💡 To suppress all current errors, run:
    oxlint-harness --update src/
 ```
 
+#### Simple List (for files with many errors)
+```
+📄 src/Components.tsx:
+  ⚠️  prefer-const: 15 excess errors (expected: 10, actual: 25)
+    • src/Components.tsx:42:12: 'data' is never reassigned
+    • src/Components.tsx:58:8: 'config' is never reassigned
+    • src/Components.tsx:74:15: 'result' is never reassigned
+    ... and 12 more
+
+    📝 To suppress, add to suppression file:
+       "src/Components.tsx": { "prefer-const": { "count": 25 } }
+```
+
 ## Requirements
 
 - Node.js 22+ (for native TypeScript support)
-- `oxlint` installed and available in PATH
+- `oxlint` installed and available (via pnpm/yarn/npm)
+
+## How It Works
+
+1. **Package Manager Detection**: Automatically detects if you're using pnpm, yarn, or npm by looking for lock files up the directory tree (supports monorepos)
+2. **Oxlint Execution**: Runs `pnpm oxlint`, `yarn oxlint`, or `npx oxlint` with JSON output
+3. **Suppression Matching**: Compares actual error counts against your suppression file
+4. **Smart Reporting**: Shows code snippets for files with few errors, simple lists for files with many errors
+5. **Colored Output**: Beautiful terminal colors that automatically disable in non-TTY environments
+
+## Contributing
+
+Issues and pull requests are welcome! Please see the [GitHub repository](https://github.com/MIreland/oxlint-harness) for more information.
 
 ## Development
 
