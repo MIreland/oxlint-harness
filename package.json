@@ -26,12 +26,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/your-username/oxlint-harness.git"
+    "url": "git+https://github.com/MIreland/oxlint-harness.git"
   },
   "bugs": {
-    "url": "https://github.com/your-username/oxlint-harness/issues"
+    "url": "https://github.com/MIreland/oxlint-harness/issues"
   },
-  "homepage": "https://github.com/your-username/oxlint-harness#readme",
+  "homepage": "https://github.com/MIreland/oxlint-harness#readme",
   "dependencies": {
     "@oclif/core": "^4.0.0",
     "@oclif/plugin-help": "^6.0.0"
