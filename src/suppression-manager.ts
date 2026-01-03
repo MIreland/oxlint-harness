@@ -115,4 +115,52 @@ export class SuppressionManager {
 
     return updated;
   }
+
+  tightenSuppressions(currentSuppressions: SuppressionFile, diagnostics: ProcessedDiagnostic[]): SuppressionFile {
+    // Group diagnostics by file and rule to get actual counts
+    const actualCounts = new Map<string, Map<string, number>>();
+
+    for (const diagnostic of diagnostics) {
+      if (!actualCounts.has(diagnostic.filename)) {
+        actualCounts.set(diagnostic.filename, new Map());
+      }
+
+      const fileRules = actualCounts.get(diagnostic.filename)!;
+      const currentCount = fileRules.get(diagnostic.rule) || 0;
+      fileRules.set(diagnostic.rule, currentCount + 1);
+    }
+
+    // Create a copy of current suppressions to modify
+    const tightened: SuppressionFile = { ...currentSuppressions };
+
+    // Process each file in current suppressions
+    for (const [filename, rules] of Object.entries(tightened)) {
+      const fileRules = { ...rules };
+
+      // Process each rule in the file
+      for (const [rule, suppression] of Object.entries(fileRules)) {
+        const expected = suppression.count;
+        const actual = actualCounts.get(filename)?.get(rule) || 0;
+
+        if (actual === 0) {
+          // Remove entry if no actual errors exist
+          delete fileRules[rule];
+        } else if (actual < expected) {
+          // Reduce count to actual if violations were cleaned up
+          fileRules[rule] = { count: actual };
+        }
+        // If actual >= expected, keep as is (excess errors handled by findExcessErrors)
+      }
+
+      // Update the file entry
+      if (Object.keys(fileRules).length === 0) {
+        // Remove file entry if no rules remain
+        delete tightened[filename];
+      } else {
+        tightened[filename] = fileRules;
+      }
+    }
+
+    return tightened;
+  }
 }

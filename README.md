@@ -55,16 +55,40 @@ The suppression file uses a count-based format:
 
 ## CLI Options
 
-| Option | Short | Description | Default |
-|--------|--------|-------------|---------|
-| `--suppressions` | `-s` | Path to suppression file | `.oxlint-suppressions.json` |
-| `--update` | `-u` | Update/create suppression file | `false` |
-| `--show-code` |  | Show code snippets for files with N or fewer errors (0 to disable) | `3` |
-| `--fail-on-excess` |  | Exit 1 if unsuppressed errors exist | `true` |
-| `--no-fail-on-excess` |  | Don't exit 1 on unsuppressed errors | - |
-| `--help` | `-h` | Show help | - |
+| Option                | Short | Description                                                        | Default                     |
+| --------------------- | ----- | ------------------------------------------------------------------ | --------------------------- |
+| `--suppressions`      | `-s`  | Path to suppression file                                           | `.oxlint-suppressions.json` |
+| `--update`            | `-u`  | Update/create suppression file                                     | `false`                     |
+| `--show-code`         |       | Show code snippets for files with N or fewer errors (0 to disable) | `3`                         |
+| `--fail-on-excess`    |       | Exit 1 if unsuppressed errors exist                                | `true`                      |
+| `--no-fail-on-excess` |       | Don't exit 1 on unsuppressed errors                                | -                           |
+| `--help`              | `-h`  | Show help                                                          | -                           |
 
-All additional arguments are passed directly to oxlint.
+### Environment Variables
+
+| Variable                                  | Description                                                                                                | Equivalent Flag |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------- | --------------- |
+| `OXLINT_HARNESS_UPDATE_BULK_SUPPRESSION`  | Set to `true` to update/create suppression file                                                            | `--update`      |
+| `OXLINT_HARNESS_TIGHTEN_BULK_SUPPRESSION` | Set to `true` to automatically remove/reduce suppressions for cleaned-up violations during non-update runs | -               |
+
+Example:
+
+```bash
+OXLINT_HARNESS_UPDATE_BULK_SUPPRESSION=true npx oxlint-harness src/
+OXLINT_HARNESS_TIGHTEN_BULK_SUPPRESSION=true npx oxlint-harness src/
+```
+
+### Passing Additional oxlint Flags
+
+All additional arguments and unknown flags are passed directly to oxlint. This allows you to use any oxlint-specific options, even if they are not documented here.
+
+For example, to enable type-aware linting:
+
+```bash
+npx oxlint-harness --type-aware src/
+```
+
+Any flag not recognized by oxlint-harness will be forwarded to oxlint automatically.
 
 ## Usage Examples
 
@@ -112,6 +136,7 @@ npx oxlint-harness --no-fail-on-excess src/
 ### Initial Setup
 
 1. Run with `--update` to create initial suppression file:
+
    ```bash
    npx oxlint-harness --update src/
    ```
@@ -129,6 +154,7 @@ npx oxlint-harness --no-fail-on-excess src/
 ### Example Output
 
 #### With Code Snippets (default for files with ≤3 errors)
+
 ```
 ❌ Found unsuppressed errors:
 
@@ -146,8 +172,8 @@ npx oxlint-harness --no-fail-on-excess src/
      ╰────
   help: Consider removing this declaration.
 
-    📝 To suppress, add to suppression file:
-       "src/App.tsx": { "eslint(no-unused-vars)": { "count": 1 } }
+    📝 To suppress, re-run with:
+    OXLINT_HARNESS_UPDATE_BULK_SUPPRESSION=true oxlint-harness [your-args]
 
 📊 Summary:
    • Files with issues: 1
@@ -158,17 +184,24 @@ npx oxlint-harness --no-fail-on-excess src/
    oxlint-harness --update src/
 ```
 
-#### Simple List (for files with many errors)
+#### With Many Errors (first error shown with code snippet)
+
 ```
 📄 src/Components.tsx:
   ⚠️  prefer-const: 15 excess errors (expected: 10, actual: 25)
-    • src/Components.tsx:42:12: 'data' is never reassigned
+
+  × prefer-const: 'data' is never reassigned. Use 'const' instead.
+     ╭─[42:12]
+  42 │ let data = fetchData();
+              ─────────────
+  help: Use 'const' instead.
+
     • src/Components.tsx:58:8: 'config' is never reassigned
     • src/Components.tsx:74:15: 'result' is never reassigned
     ... and 12 more
 
-    📝 To suppress, add to suppression file:
-       "src/Components.tsx": { "prefer-const": { "count": 25 } }
+    📝 To suppress, re-run with:
+    OXLINT_HARNESS_UPDATE_BULK_SUPPRESSION=true oxlint-harness [your-args]
 ```
 
 ## Requirements

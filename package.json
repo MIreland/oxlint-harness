@@ -1,6 +1,6 @@
 {
   "name": "oxlint-harness",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A harness for oxlint with bulk suppressions support",
   "type": "module",
   "main": "dist/index.js",
@@ -43,5 +43,6 @@
   },
   "engines": {
     "node": ">=22"
-  }
+  },
+  "packageManager": "pnpm@9.15.9"
 }
