@@ -1,10 +1,10 @@
-import { readFileSync, writeFileSync, existsSync } from 'fs';
-import { SuppressionFile, ProcessedDiagnostic, ExcessError } from './types.js';
+import { readFileSync, writeFileSync, existsSync } from "fs";
+import { SuppressionFile, ProcessedDiagnostic, ExcessError } from "./types.js";
 
 export class SuppressionManager {
   private suppressionFile: string;
 
-  constructor(suppressionFile: string = '.oxlint-suppressions.json') {
+  constructor(suppressionFile: string = ".oxlint-suppressions.json") {
     this.suppressionFile = suppressionFile;
   }
 
@@ -14,19 +14,27 @@ export class SuppressionManager {
     }
 
     try {
-      const content = readFileSync(this.suppressionFile, 'utf8');
+      const content = readFileSync(this.suppressionFile, "utf8");
       return JSON.parse(content);
     } catch (error) {
-      throw new Error(`Failed to parse suppression file ${this.suppressionFile}: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Failed to parse suppression file ${this.suppressionFile}: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
     }
   }
 
   saveSuppressions(suppressions: SuppressionFile): void {
     try {
       const content = JSON.stringify(suppressions, null, 2);
-      writeFileSync(this.suppressionFile, content, 'utf8');
+      writeFileSync(this.suppressionFile, content, "utf8");
     } catch (error) {
-      throw new Error(`Failed to write suppression file ${this.suppressionFile}: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Failed to write suppression file ${this.suppressionFile}: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
     }
   }
 
@@ -57,7 +65,10 @@ export class SuppressionManager {
     return suppressions;
   }
 
-  findExcessErrors(diagnostics: ProcessedDiagnostic[], suppressions: SuppressionFile): ExcessError[] {
+  findExcessErrors(
+    diagnostics: ProcessedDiagnostic[],
+    suppressions: SuppressionFile
+  ): ExcessError[] {
     const excessErrors: ExcessError[] = [];
 
     // Group diagnostics by file and rule
@@ -87,7 +98,7 @@ export class SuppressionManager {
             filename,
             expected,
             actual,
-            diagnostics: diagnosticsForRule
+            diagnostics: diagnosticsForRule,
           });
         }
       }
@@ -96,7 +107,10 @@ export class SuppressionManager {
     return excessErrors;
   }
 
-  updateSuppressions(currentSuppressions: SuppressionFile, diagnostics: ProcessedDiagnostic[]): SuppressionFile {
+  updateSuppressions(
+    currentSuppressions: SuppressionFile,
+    diagnostics: ProcessedDiagnostic[]
+  ): SuppressionFile {
     const newSuppressions = this.generateSuppressions(diagnostics);
 
     // Merge with existing suppressions, using new counts
@@ -116,7 +130,10 @@ export class SuppressionManager {
     return updated;
   }
 
-  tightenSuppressions(currentSuppressions: SuppressionFile, diagnostics: ProcessedDiagnostic[]): SuppressionFile {
+  tightenSuppressions(
+    currentSuppressions: SuppressionFile,
+    diagnostics: ProcessedDiagnostic[]
+  ): SuppressionFile {
     // Group diagnostics by file and rule to get actual counts
     const actualCounts = new Map<string, Map<string, number>>();
 

@@ -1,8 +1,11 @@
 import { Command, Flags, Args } from "@oclif/core";
+import { mkdir, writeFile } from "fs/promises";
+import { dirname } from "path";
 import { OxlintRunner } from "./oxlint-runner.js";
 import { SuppressionManager } from "./suppression-manager.js";
 import { ErrorReporter } from "./error-reporter.js";
 import { ColorFormatter } from "./colors.js";
+import { ProcessedDiagnostic } from "./types.js";
 
 export default class OxlintHarness extends Command {
   static summary = "Run oxlint with bulk suppressions support";
@@ -45,6 +48,17 @@ The suppression file format uses counts per rule per file:
       description:
         "Show code snippets for files with N or fewer errors (0 to disable)",
       default: 3,
+    }),
+    "results-path": Flags.string({
+      description:
+        "Path to save oxlint JSON results (default: artifacts/oxlint-results.json)",
+      default: "artifacts/oxlint-results.json",
+      env: "OXLINT_HARNESS_RESULTS_PATH",
+    }),
+    "save-results": Flags.boolean({
+      description: "Save oxlint JSON results to file",
+      default: true,
+      allowNo: true,
     }),
   };
 
@@ -89,7 +103,21 @@ The suppression file format uses counts per rule per file:
       this.log(
         "      --show-code <number>      Show code snippets for files with N or fewer errors (default: 3, 0 to disable)"
       );
+      this.log(
+        "      --results-path <path>     Path to save oxlint JSON results (default: artifacts/oxlint-results.json)"
+      );
+      this.log(
+        "      --no-save-results         Don't save oxlint JSON results to file"
+      );
       this.log("  -h, --help                    Show this help message");
+      this.log("");
+      this.log("ENVIRONMENT VARIABLES");
+      this.log(
+        "  OXLINT_HARNESS_RESULTS_PATH          Override the results file path"
+      );
+      this.log(
+        "  OXLINT_HARNESS_NO_FAIL_ON_EXCESS     Set to 'true' to exit 0 on new errors"
+      );
       this.log("");
       this.log("ARGS");
       this.log(
@@ -123,6 +151,10 @@ The suppression file format uses counts per rule per file:
           update: false,
           "fail-on-excess": true,
           "show-code": 3,
+          "results-path":
+            process.env.OXLINT_HARNESS_RESULTS_PATH ||
+            "artifacts/oxlint-results.json",
+          "save-results": true,
         };
 
         const knownFlagNames = new Set([
@@ -133,6 +165,9 @@ The suppression file format uses counts per rule per file:
           "--fail-on-excess",
           "--no-fail-on-excess",
           "--show-code",
+          "--results-path",
+          "--save-results",
+          "--no-save-results",
         ]);
 
         // Manually parse known flags and collect unknown ones
@@ -150,6 +185,13 @@ The suppression file format uses counts per rule per file:
           } else if (arg === "--show-code") {
             const value = rawArgs[++i];
             if (value) parsedFlags["show-code"] = parseInt(value, 10) || 3;
+          } else if (arg === "--results-path") {
+            parsedFlags["results-path"] =
+              rawArgs[++i] || parsedFlags["results-path"];
+          } else if (arg === "--save-results") {
+            parsedFlags["save-results"] = true;
+          } else if (arg === "--no-save-results") {
+            parsedFlags["save-results"] = false;
           } else if (
             !knownFlagNames.has(arg) &&
             arg !== "--help" &&
@@ -175,12 +217,24 @@ The suppression file format uses counts per rule per file:
       flags.update = true;
     }
 
+    // Check for OXLINT_HARNESS_NO_FAIL_ON_EXCESS environment variable
+    if (
+      process.env.OXLINT_HARNESS_NO_FAIL_ON_EXCESS?.toLowerCase() === "true"
+    ) {
+      flags["fail-on-excess"] = false;
+    }
+
     const colors = new ColorFormatter();
 
     try {
       // Run oxlint with remaining args
       const runner = new OxlintRunner();
       const diagnostics = await runner.run(oxlintArgs);
+
+      // Save results if enabled
+      if (flags["save-results"]) {
+        await this.saveResults(flags["results-path"], diagnostics);
+      }
 
       // Handle suppression logic
       const suppressionManager = new SuppressionManager(flags.suppressions);
@@ -253,5 +307,14 @@ The suppression file format uses counts per rule per file:
     } catch (error) {
       this.error(error instanceof Error ? error.message : String(error));
     }
+  }
+
+  private async saveResults(
+    path: string,
+    diagnostics: ProcessedDiagnostic[]
+  ): Promise<void> {
+    const dir = dirname(path);
+    await mkdir(dir, { recursive: true });
+    await writeFile(path, JSON.stringify(diagnostics, null, 2));
   }
 }
