@@ -1,11 +1,35 @@
 import { readFileSync, writeFileSync, existsSync } from "fs";
-import { SuppressionFile, ProcessedDiagnostic, ExcessError } from "./types.js";
+import {
+  SuppressionFile,
+  SuppressionRule,
+  ProcessedDiagnostic,
+  ExcessError,
+} from "./types.js";
 
 export class SuppressionManager {
   private suppressionFile: string;
 
   constructor(suppressionFile: string = ".oxlint-suppressions.json") {
     this.suppressionFile = suppressionFile;
+  }
+
+  private sortSuppressions(suppressions: SuppressionFile): SuppressionFile {
+    const sorted: SuppressionFile = {};
+    const sortedFilenames = Object.keys(suppressions).sort();
+
+    for (const filename of sortedFilenames) {
+      const rules = suppressions[filename];
+      const sortedRules: { [ruleName: string]: SuppressionRule } = {};
+      const sortedRuleNames = Object.keys(rules).sort();
+
+      for (const ruleName of sortedRuleNames) {
+        sortedRules[ruleName] = rules[ruleName];
+      }
+
+      sorted[filename] = sortedRules;
+    }
+
+    return sorted;
   }
 
   loadSuppressions(): SuppressionFile {
@@ -27,7 +51,8 @@ export class SuppressionManager {
 
   saveSuppressions(suppressions: SuppressionFile): void {
     try {
-      const content = JSON.stringify(suppressions, null, 2);
+      const sorted = this.sortSuppressions(suppressions);
+      const content = JSON.stringify(sorted, null, 2);
       writeFileSync(this.suppressionFile, content, "utf8");
     } catch (error) {
       throw new Error(
@@ -62,7 +87,7 @@ export class SuppressionManager {
       }
     }
 
-    return suppressions;
+    return this.sortSuppressions(suppressions);
   }
 
   findExcessErrors(
@@ -127,7 +152,7 @@ export class SuppressionManager {
       }
     }
 
-    return updated;
+    return this.sortSuppressions(updated);
   }
 
   tightenSuppressions(
@@ -178,6 +203,6 @@ export class SuppressionManager {
       }
     }
 
-    return tightened;
+    return this.sortSuppressions(tightened);
   }
 }

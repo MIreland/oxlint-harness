@@ -1,11 +1,19 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { spawn } from 'child_process';
+import { existsSync } from 'fs';
 import { OxlintRunner } from '../src/oxlint-runner.js';
 
 vi.mock('child_process');
+vi.mock('fs');
 
 describe('OxlintRunner', () => {
   const mockSpawn = vi.mocked(spawn);
+  const mockExistsSync = vi.mocked(existsSync);
+
+  beforeEach(() => {
+    // Mock existsSync to return false so detectPackageManager falls back to 'oxlint'
+    mockExistsSync.mockReturnValue(false);
+  });
 
   it('should parse oxlint JSON output correctly', async () => {
     const mockStdout = JSON.stringify({
