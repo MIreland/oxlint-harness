@@ -240,6 +240,13 @@ pnpm lint
 pnpm dev --help
 ```
 
+## Publishing
+
+```
+npm login
+npm publish
+```
+
 ## License
 
 MIT

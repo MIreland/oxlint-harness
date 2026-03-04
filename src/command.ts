@@ -60,6 +60,13 @@ The suppression file format uses counts per rule per file:
       default: true,
       allowNo: true,
     }),
+    tighten: Flags.boolean({
+      char: "t",
+      description:
+        "Tighten suppressions by reducing counts when violations are fixed",
+      default: true,
+      allowNo: true,
+    }),
   };
 
   static args = {
@@ -73,7 +80,7 @@ The suppression file format uses counts per rule per file:
 
   async run(): Promise<void> {
     // Check for help flag first - check both this.argv and process.argv
-    const rawArgs = this.argv.slice(1);
+    const rawArgs = this.argv;
     const processArgs = process.argv.slice(2); // Skip 'node' and script path
     const hasHelp =
       rawArgs.includes("--help") ||
@@ -109,6 +116,18 @@ The suppression file format uses counts per rule per file:
       this.log(
         "      --no-save-results         Don't save oxlint JSON results to file"
       );
+      this.log(
+        "  -t, --tighten                 Tighten suppressions when violations are fixed (default: true)"
+      );
+      this.log(
+        "      --no-tighten              Don't tighten suppressions"
+      );
+      this.log(
+        "      --no-type-aware           Don't pass --type-aware to oxlint (default: passes it)"
+      );
+      this.log(
+        "      --no-type-check           Don't pass --type-check to oxlint (default: passes it)"
+      );
       this.log("  -h, --help                    Show this help message");
       this.log("");
       this.log("ENVIRONMENT VARIABLES");
@@ -117,6 +136,12 @@ The suppression file format uses counts per rule per file:
       );
       this.log(
         "  OXLINT_HARNESS_NO_FAIL_ON_EXCESS     Set to 'true' to exit 0 on new errors"
+      );
+      this.log(
+        "  OXLINT_HARNESS_NO_TYPE_AWARE         Set to 'true' to skip --type-aware"
+      );
+      this.log(
+        "  OXLINT_HARNESS_NO_TYPE_CHECK         Set to 'true' to skip --type-check"
       );
       this.log("");
       this.log("ARGS");
@@ -136,10 +161,72 @@ The suppression file format uses counts per rule per file:
     let flags: any;
     let oxlintArgs: string[] = [];
 
+    const knownFlagNames = new Set([
+      "--suppressions",
+      "-s",
+      "--update",
+      "-u",
+      "--fail-on-excess",
+      "--no-fail-on-excess",
+      "--show-code",
+      "--results-path",
+      "--save-results",
+      "--no-save-results",
+      "--tighten",
+      "-t",
+      "--no-tighten",
+      "--no-type-aware",
+      "--no-type-check",
+    ]);
+
+    const collectOxlintArgs = (args: string[]): string[] => {
+      const passthrough: string[] = [];
+
+      for (let i = 0; i < args.length; i++) {
+        const arg = args[i];
+
+        if (arg === "--suppressions" || arg === "-s") {
+          i++; // consume value
+          continue;
+        }
+        if (arg === "--update" || arg === "-u") {
+          continue;
+        }
+        if (arg === "--fail-on-excess" || arg === "--no-fail-on-excess") {
+          continue;
+        }
+        if (arg === "--show-code") {
+          i++; // consume value
+          continue;
+        }
+        if (arg === "--results-path") {
+          i++; // consume value
+          continue;
+        }
+        if (arg === "--save-results" || arg === "--no-save-results") {
+          continue;
+        }
+        if (arg === "--tighten" || arg === "-t" || arg === "--no-tighten") {
+          continue;
+        }
+        if (arg === "--no-type-aware" || arg === "--no-type-check") {
+          continue;
+        }
+        if (arg === "--help" || arg === "-h") {
+          continue;
+        }
+
+        // Unknown flag or positional arg - pass to oxlint
+        passthrough.push(arg);
+      }
+
+      return passthrough;
+    };
+
     try {
       const parsed = await this.parse(OxlintHarness);
       flags = parsed.flags;
-      oxlintArgs = parsed.argv as string[];
+      oxlintArgs = collectOxlintArgs(rawArgs);
     } catch (error: any) {
       // If error is due to unknown flags (NonExistentFlagsError), manually parse
       if (
@@ -155,20 +242,8 @@ The suppression file format uses counts per rule per file:
             process.env.OXLINT_HARNESS_RESULTS_PATH ||
             "artifacts/oxlint-results.json",
           "save-results": true,
+          tighten: true,
         };
-
-        const knownFlagNames = new Set([
-          "--suppressions",
-          "-s",
-          "--update",
-          "-u",
-          "--fail-on-excess",
-          "--no-fail-on-excess",
-          "--show-code",
-          "--results-path",
-          "--save-results",
-          "--no-save-results",
-        ]);
 
         // Manually parse known flags and collect unknown ones
         for (let i = 0; i < rawArgs.length; i++) {
@@ -192,6 +267,10 @@ The suppression file format uses counts per rule per file:
             parsedFlags["save-results"] = true;
           } else if (arg === "--no-save-results") {
             parsedFlags["save-results"] = false;
+          } else if (arg === "--tighten" || arg === "-t") {
+            parsedFlags.tighten = true;
+          } else if (arg === "--no-tighten") {
+            parsedFlags.tighten = false;
           } else if (
             !knownFlagNames.has(arg) &&
             arg !== "--help" &&
@@ -207,6 +286,21 @@ The suppression file format uses counts per rule per file:
         // Re-throw if it's a different error
         throw error;
       }
+    }
+
+    // Default --type-aware and --type-check unless opted out
+    const noTypeAware =
+      rawArgs.includes("--no-type-aware") ||
+      process.env.OXLINT_HARNESS_NO_TYPE_AWARE?.toLowerCase() === "true";
+    const noTypeCheck =
+      rawArgs.includes("--no-type-check") ||
+      process.env.OXLINT_HARNESS_NO_TYPE_CHECK?.toLowerCase() === "true";
+
+    if (!noTypeAware && !oxlintArgs.includes("--type-aware")) {
+      oxlintArgs.unshift("--type-aware");
+    }
+    if (!noTypeCheck && !oxlintArgs.includes("--type-check")) {
+      oxlintArgs.unshift("--type-check");
     }
 
     // Check for OXLINT_HARNESS_UPDATE_BULK_SUPPRESSION environment variable
@@ -268,10 +362,14 @@ The suppression file format uses counts per rule per file:
         suppressions
       );
 
-      // Check for OXLINT_HARNESS_TIGHTEN_BULK_SUPPRESSION environment variable
-      const shouldTighten =
+      // Tighten is on by default; env var can override the flag
+      let shouldTighten = flags.tighten;
+      if (
         process.env.OXLINT_HARNESS_TIGHTEN_BULK_SUPPRESSION?.toLowerCase() ===
-        "true";
+        "true"
+      ) {
+        shouldTighten = true;
+      }
 
       if (shouldTighten) {
         // Tighten suppressions by removing/reducing cleaned-up violations
@@ -302,10 +400,11 @@ The suppression file format uses counts per rule per file:
       reporter.reportExcessErrors(excessErrors, flags["show-code"]);
 
       if (flags["fail-on-excess"]) {
-        this.exit(1);
+        process.exit(1);
       }
     } catch (error) {
-      this.error(error instanceof Error ? error.message : String(error));
+      this.logToStderr(error instanceof Error ? error.message : String(error));
+      process.exit(2);
     }
   }
 

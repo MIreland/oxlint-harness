@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { unlinkSync, existsSync } from 'fs';
 import { SuppressionManager } from '../src/suppression-manager.js';
-import { ProcessedDiagnostic } from '../src/types.js';
+import { ProcessedDiagnostic, SuppressionFile } from '../src/types.js';
 
 describe('SuppressionManager', () => {
   const testFile = './test-suppressions.json';
@@ -159,6 +159,209 @@ describe('SuppressionManager', () => {
       expect(excess).toHaveLength(1);
       expect(excess[0].expected).toBe(0);
       expect(excess[0].actual).toBe(1);
+    });
+  });
+
+  describe('tightenSuppressions', () => {
+    it('should reduce count when violations decrease', () => {
+      const current: SuppressionFile = {
+        'src/test.ts': {
+          'no-unused-vars': { count: 5 }
+        }
+      };
+
+      const diagnostics: ProcessedDiagnostic[] = [
+        { filename: 'src/test.ts', rule: 'no-unused-vars', severity: 'error', message: 'Unused 1' },
+        { filename: 'src/test.ts', rule: 'no-unused-vars', severity: 'error', message: 'Unused 2' },
+        { filename: 'src/test.ts', rule: 'no-unused-vars', severity: 'error', message: 'Unused 3' }
+      ];
+
+      const result = manager.tightenSuppressions(current, diagnostics);
+
+      expect(result).toEqual({
+        'src/test.ts': {
+          'no-unused-vars': { count: 3 }
+        }
+      });
+    });
+
+    it('should remove a rule when all its violations are fixed', () => {
+      const current: SuppressionFile = {
+        'src/test.ts': {
+          'no-unused-vars': { count: 2 },
+          'prefer-const': { count: 1 }
+        }
+      };
+
+      const diagnostics: ProcessedDiagnostic[] = [
+        { filename: 'src/test.ts', rule: 'prefer-const', severity: 'error', message: 'Use const' }
+      ];
+
+      const result = manager.tightenSuppressions(current, diagnostics);
+
+      expect(result).toEqual({
+        'src/test.ts': {
+          'prefer-const': { count: 1 }
+        }
+      });
+    });
+
+    it('should remove entire file entry when all its rules are resolved', () => {
+      const current: SuppressionFile = {
+        'src/test.ts': {
+          'no-unused-vars': { count: 2 },
+          'prefer-const': { count: 1 }
+        },
+        'src/other.ts': {
+          'no-var': { count: 1 }
+        }
+      };
+
+      const diagnostics: ProcessedDiagnostic[] = [
+        { filename: 'src/other.ts', rule: 'no-var', severity: 'error', message: 'No var' }
+      ];
+
+      const result = manager.tightenSuppressions(current, diagnostics);
+
+      expect(result).toEqual({
+        'src/other.ts': {
+          'no-var': { count: 1 }
+        }
+      });
+    });
+
+    it('should keep count unchanged when violations match', () => {
+      const current: SuppressionFile = {
+        'src/test.ts': {
+          'no-unused-vars': { count: 2 }
+        }
+      };
+
+      const diagnostics: ProcessedDiagnostic[] = [
+        { filename: 'src/test.ts', rule: 'no-unused-vars', severity: 'error', message: 'Unused 1' },
+        { filename: 'src/test.ts', rule: 'no-unused-vars', severity: 'error', message: 'Unused 2' }
+      ];
+
+      const result = manager.tightenSuppressions(current, diagnostics);
+
+      expect(result).toEqual({
+        'src/test.ts': {
+          'no-unused-vars': { count: 2 }
+        }
+      });
+    });
+
+    it('should keep count unchanged when violations exceed suppression', () => {
+      const current: SuppressionFile = {
+        'src/test.ts': {
+          'no-unused-vars': { count: 2 }
+        }
+      };
+
+      const diagnostics: ProcessedDiagnostic[] = [
+        { filename: 'src/test.ts', rule: 'no-unused-vars', severity: 'error', message: 'Unused 1' },
+        { filename: 'src/test.ts', rule: 'no-unused-vars', severity: 'error', message: 'Unused 2' },
+        { filename: 'src/test.ts', rule: 'no-unused-vars', severity: 'error', message: 'Unused 3' }
+      ];
+
+      const result = manager.tightenSuppressions(current, diagnostics);
+
+      expect(result).toEqual({
+        'src/test.ts': {
+          'no-unused-vars': { count: 2 }
+        }
+      });
+    });
+
+    it('should handle multiple files and rules together', () => {
+      const current: SuppressionFile = {
+        'src/a.ts': {
+          'no-unused-vars': { count: 5 },
+          'prefer-const': { count: 3 }
+        },
+        'src/b.ts': {
+          'no-var': { count: 2 },
+          'no-console': { count: 1 }
+        },
+        'src/c.ts': {
+          'eqeqeq': { count: 4 }
+        }
+      };
+
+      const diagnostics: ProcessedDiagnostic[] = [
+        // a.ts: no-unused-vars reduced from 5→2, prefer-const stays at 3
+        { filename: 'src/a.ts', rule: 'no-unused-vars', severity: 'error', message: 'Unused 1' },
+        { filename: 'src/a.ts', rule: 'no-unused-vars', severity: 'error', message: 'Unused 2' },
+        { filename: 'src/a.ts', rule: 'prefer-const', severity: 'error', message: 'Const 1' },
+        { filename: 'src/a.ts', rule: 'prefer-const', severity: 'error', message: 'Const 2' },
+        { filename: 'src/a.ts', rule: 'prefer-const', severity: 'error', message: 'Const 3' },
+        // b.ts: no-var removed (0 diagnostics), no-console stays at 1
+        { filename: 'src/b.ts', rule: 'no-console', severity: 'error', message: 'Console 1' }
+        // c.ts: entirely removed (0 diagnostics)
+      ];
+
+      const result = manager.tightenSuppressions(current, diagnostics);
+
+      expect(result).toEqual({
+        'src/a.ts': {
+          'no-unused-vars': { count: 2 },
+          'prefer-const': { count: 3 }
+        },
+        'src/b.ts': {
+          'no-console': { count: 1 }
+        }
+      });
+    });
+
+    it('should return empty object when all suppressions are resolved', () => {
+      const current: SuppressionFile = {
+        'src/test.ts': {
+          'no-unused-vars': { count: 2 }
+        },
+        'src/other.ts': {
+          'no-var': { count: 1 }
+        }
+      };
+
+      const diagnostics: ProcessedDiagnostic[] = [];
+
+      const result = manager.tightenSuppressions(current, diagnostics);
+
+      expect(result).toEqual({});
+    });
+
+    it('should return sorted output', () => {
+      const current: SuppressionFile = {
+        'src/z.ts': {
+          'z-rule': { count: 1 },
+          'a-rule': { count: 2 }
+        },
+        'src/a.ts': {
+          'z-rule': { count: 3 },
+          'a-rule': { count: 1 }
+        }
+      };
+
+      const diagnostics: ProcessedDiagnostic[] = [
+        { filename: 'src/z.ts', rule: 'z-rule', severity: 'error', message: 'Z' },
+        { filename: 'src/z.ts', rule: 'a-rule', severity: 'error', message: 'A1' },
+        { filename: 'src/z.ts', rule: 'a-rule', severity: 'error', message: 'A2' },
+        { filename: 'src/a.ts', rule: 'z-rule', severity: 'error', message: 'Z1' },
+        { filename: 'src/a.ts', rule: 'z-rule', severity: 'error', message: 'Z2' },
+        { filename: 'src/a.ts', rule: 'z-rule', severity: 'error', message: 'Z3' },
+        { filename: 'src/a.ts', rule: 'a-rule', severity: 'error', message: 'A' }
+      ];
+
+      const result = manager.tightenSuppressions(current, diagnostics);
+
+      const fileKeys = Object.keys(result);
+      expect(fileKeys).toEqual(['src/a.ts', 'src/z.ts']);
+
+      const aRules = Object.keys(result['src/a.ts']);
+      expect(aRules).toEqual(['a-rule', 'z-rule']);
+
+      const zRules = Object.keys(result['src/z.ts']);
+      expect(zRules).toEqual(['a-rule', 'z-rule']);
     });
   });
 

@@ -1,6 +1,6 @@
 {
   "name": "oxlint-harness",
-  "version": "1.0.3",
+  "version": "1.0.7",
   "description": "A harness for oxlint with bulk suppressions support",
   "type": "module",
   "main": "dist/index.js",
@@ -21,7 +21,14 @@
     "lint": "oxlint src/",
     "typecheck": "tsgo"
   },
-  "keywords": ["oxlint", "linting", "suppressions", "eslint", "bulk-suppressions", "cli"],
+  "keywords": [
+    "oxlint",
+    "linting",
+    "suppressions",
+    "eslint",
+    "bulk-suppressions",
+    "cli"
+  ],
   "author": "Generated with Claude Code",
   "license": "MIT",
   "repository": {
