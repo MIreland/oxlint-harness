@@ -77,6 +77,14 @@ export class OxlintRunner {
           // oxlint exits with non-zero when linting issues are found
           // We still want to parse the JSON output
           const diagnostics = this.parseOxlintOutput(stdout);
+          // If oxlint produced no diagnostics but exited with a code other than
+          // 0 (success) or 1 (lint violations found), treat it as a failure.
+          // This prevents tighten from wiping the suppression file when oxlint
+          // fails silently (e.g. missing tsconfig for --type-aware).
+          if (diagnostics.length === 0 && code !== 0 && code !== 1) {
+            reject(new Error(`oxlint exited with code ${code} and produced no output.\nStderr: ${stderr}`));
+            return;
+          }
           resolve(diagnostics);
         } catch (error) {
           reject(new Error(`Failed to parse oxlint output: ${error instanceof Error ? error.message : String(error)}\nStdout: ${stdout}\nStderr: ${stderr}`));
